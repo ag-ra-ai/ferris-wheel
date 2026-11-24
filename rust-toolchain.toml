@@ -1,0 +1,5 @@
+# Pins the exact compiler so every machine and CI builds with the same Rust.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

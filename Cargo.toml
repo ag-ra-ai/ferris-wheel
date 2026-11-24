@@ -1,0 +1,24 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99.1"
+license = "MIT"
+repository = "https://github.com/ag-ra-ai/ferris-wheel"
+
+# Shared dependency versions live here; member crates use `dep.workspace = true`.
+[workspace.dependencies]
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Dependencies (e.g. wgpu) are slow in debug; optimize them, keep our code fast to compile.
+[profile.dev.package."*"]
+opt-level = 2
