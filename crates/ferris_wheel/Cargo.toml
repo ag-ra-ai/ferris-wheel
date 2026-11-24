@@ -8,6 +8,13 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+wgpu.workspace = true
+winit.workspace = true
+pollster.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+env_logger.workspace = true
 
 [lints]
 workspace = true
