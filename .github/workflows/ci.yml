@@ -25,6 +25,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      # Lavapipe: a software Vulkan driver, so GPU tests run without a GPU.
+      - name: Install software Vulkan driver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
+
       - name: Format
         run: cargo fmt --all --check
 
@@ -33,6 +39,8 @@ jobs:
 
       - name: Test
         run: cargo test --workspace --locked
+        env:
+          WGPU_BACKEND: vulkan
 
       - name: Build examples
         run: cargo build --workspace --examples --locked

@@ -3,9 +3,11 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
-use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, WindowEvent};
 use winit::keyboard::PhysicalKey;
+
+use crate::Vec2;
+use crate::viewport::Viewport;
 
 /// A mouse button.
 pub use winit::event::MouseButton;
@@ -18,11 +20,14 @@ pub use winit::keyboard::KeyCode as Key;
 /// "Pressed" and "released" are true for exactly one update after the event,
 /// even if several frames pass without an update or several updates run in
 /// one frame.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Input {
     keys: Buttons<Key>,
     mouse_buttons: Buttons<MouseButton>,
-    mouse_position: Option<(f32, f32)>,
+    /// Cursor position in physical window pixels; converted on request so a
+    /// resize between mouse moves still gives the right world position.
+    cursor: Option<Vec2>,
+    viewport: Viewport,
 }
 
 impl Input {
@@ -56,15 +61,29 @@ impl Input {
         self.mouse_buttons.released.contains(&button)
     }
 
-    /// Cursor position in logical pixels from the window's top-left corner,
-    /// or `None` when the cursor is outside the window.
-    pub fn mouse_position(&self) -> Option<(f32, f32)> {
-        self.mouse_position
+    /// Cursor position in world units, or `None` when the cursor is outside
+    /// the window. Over the letterbox bars this is outside the view, e.g. a
+    /// negative x.
+    pub fn mouse_position(&self) -> Option<Vec2> {
+        self.cursor.map(|c| self.viewport.window_to_world(c))
     }
 
-    /// Updates state from a window event. `scale_factor` converts physical
-    /// pixels to logical pixels.
-    pub(crate) fn handle_event(&mut self, event: &WindowEvent, scale_factor: f64) {
+    pub(crate) fn new(viewport: Viewport) -> Self {
+        Self {
+            keys: Buttons::default(),
+            mouse_buttons: Buttons::default(),
+            cursor: None,
+            viewport,
+        }
+    }
+
+    /// Call when the window resizes so mouse positions map correctly.
+    pub(crate) fn set_viewport(&mut self, viewport: Viewport) {
+        self.viewport = viewport;
+    }
+
+    /// Updates state from a window event.
+    pub(crate) fn handle_event(&mut self, event: &WindowEvent) {
         match event {
             WindowEvent::KeyboardInput { event, .. } => {
                 let PhysicalKey::Code(key) = event.physical_key else {
@@ -82,9 +101,9 @@ impl Input {
                 ElementState::Released => self.mouse_buttons.up(*button),
             },
             WindowEvent::CursorMoved { position, .. } => {
-                self.mouse_position = Some(to_logical(*position, scale_factor));
+                self.cursor = Some(Vec2::new(position.x as f32, position.y as f32));
             }
-            WindowEvent::CursorLeft { .. } => self.mouse_position = None,
+            WindowEvent::CursorLeft { .. } => self.cursor = None,
             // We won't see the key-up events while unfocused, so let go of
             // everything now rather than leave keys stuck down.
             WindowEvent::Focused(false) => self.release_all(),
@@ -102,11 +121,6 @@ impl Input {
         self.keys.release_all();
         self.mouse_buttons.release_all();
     }
-}
-
-fn to_logical(position: PhysicalPosition<f64>, scale_factor: f64) -> (f32, f32) {
-    let logical = position.to_logical::<f64>(scale_factor);
-    (logical.x as f32, logical.y as f32)
 }
 
 /// Held / pressed / released tracking for one kind of button.
@@ -155,9 +169,13 @@ impl<T: Copy + Eq + Hash> Buttons<T> {
 mod tests {
     use super::*;
 
+    fn input() -> Input {
+        Input::new(Viewport::fit(Vec2::new(320.0, 180.0), 640, 360))
+    }
+
     #[test]
     fn press_lasts_one_update_hold_persists() {
-        let mut input = Input::default();
+        let mut input = input();
         input.keys.down(Key::Space);
         assert!(input.key_pressed(Key::Space));
         assert!(input.key_held(Key::Space));
@@ -169,7 +187,7 @@ mod tests {
 
     #[test]
     fn release_lasts_one_update() {
-        let mut input = Input::default();
+        let mut input = input();
         input.keys.down(Key::KeyA);
         input.end_update();
         input.keys.up(Key::KeyA);
@@ -182,7 +200,7 @@ mod tests {
 
     #[test]
     fn tap_between_updates_is_not_lost() {
-        let mut input = Input::default();
+        let mut input = input();
         input.keys.down(Key::Enter);
         input.keys.up(Key::Enter);
         assert!(input.key_pressed(Key::Enter));
@@ -192,7 +210,7 @@ mod tests {
 
     #[test]
     fn duplicate_down_is_not_a_new_press() {
-        let mut input = Input::default();
+        let mut input = input();
         input.keys.down(Key::KeyW);
         input.end_update();
         input.keys.down(Key::KeyW);
@@ -201,19 +219,19 @@ mod tests {
 
     #[test]
     fn release_without_press_is_ignored() {
-        let mut input = Input::default();
+        let mut input = input();
         input.keys.up(Key::KeyQ);
         assert!(!input.key_released(Key::KeyQ));
     }
 
     #[test]
     fn focus_loss_releases_everything() {
-        let mut input = Input::default();
+        let mut input = input();
         input.keys.down(Key::ArrowLeft);
         input.mouse_buttons.down(MouseButton::Left);
         input.end_update();
 
-        input.handle_event(&WindowEvent::Focused(false), 1.0);
+        input.handle_event(&WindowEvent::Focused(false));
         assert!(!input.key_held(Key::ArrowLeft));
         assert!(input.key_released(Key::ArrowLeft));
         assert!(!input.mouse_held(MouseButton::Left));
@@ -221,10 +239,13 @@ mod tests {
     }
 
     #[test]
-    fn mouse_position_is_in_logical_pixels() {
-        assert_eq!(
-            to_logical(PhysicalPosition::new(200.0, 100.0), 2.0),
-            (100.0, 50.0)
-        );
+    fn mouse_position_is_in_world_units_and_follows_resize() {
+        let mut input = input(); // scale 2
+        assert_eq!(input.mouse_position(), None);
+        input.cursor = Some(Vec2::new(200.0, 100.0));
+        assert_eq!(input.mouse_position(), Some(Vec2::new(100.0, 50.0)));
+
+        input.set_viewport(Viewport::fit(Vec2::new(320.0, 180.0), 1280, 720)); // scale 4
+        assert_eq!(input.mouse_position(), Some(Vec2::new(50.0, 25.0)));
     }
 }

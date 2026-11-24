@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use winit::window::Window;
 
-use crate::{Color, Error};
+use crate::renderer::QuadRenderer;
+use crate::viewport::Viewport;
+use crate::{Error, Frame};
 
 /// Everything needed to draw into the window.
 pub(crate) struct Gpu {
@@ -14,6 +16,7 @@ pub(crate) struct Gpu {
     surface: wgpu::Surface<'static>,
     config: wgpu::SurfaceConfiguration,
     window: Arc<Window>,
+    renderer: QuadRenderer,
 }
 
 impl Gpu {
@@ -56,6 +59,7 @@ impl Gpu {
         // Fifo (vsync) is the one present mode every platform must support.
         config.present_mode = wgpu::PresentMode::Fifo;
         surface.configure(&device, &config);
+        let renderer = QuadRenderer::new(&device, config.format);
 
         Ok(Self {
             instance,
@@ -64,11 +68,17 @@ impl Gpu {
             surface,
             config,
             window,
+            renderer,
         })
     }
 
     pub(crate) fn window(&self) -> &Window {
         &self.window
+    }
+
+    /// Current drawing surface size in physical pixels.
+    pub(crate) fn size(&self) -> (u32, u32) {
+        (self.config.width, self.config.height)
     }
 
     /// Updates the drawing surface to match a new window size.
@@ -82,18 +92,18 @@ impl Gpu {
         self.surface.configure(&self.device, &self.config);
     }
 
-    /// Clears the window to `clear` and shows the result.
-    pub(crate) fn render(&mut self, clear: Color) {
+    /// Draws `frame` into the window and shows the result.
+    pub(crate) fn render(&mut self, frame: &Frame, viewport: &Viewport) {
         let size = self.window.inner_size();
         if size.width == 0 || size.height == 0 {
             return;
         }
 
-        let frame = match self.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(frame) => frame,
-            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => {
+        let target = match self.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(target) => target,
+            wgpu::CurrentSurfaceTexture::Suboptimal(target) => {
                 // Draw this frame, then reconfigure for the next one.
-                self.draw_and_present(frame, clear);
+                self.draw_and_present(target, frame, viewport);
                 self.surface.configure(&self.device, &self.config);
                 return;
             }
@@ -113,20 +123,20 @@ impl Gpu {
                 return;
             }
         };
-        self.draw_and_present(frame, clear);
+        self.draw_and_present(target, frame, viewport);
     }
 
-    fn draw_and_present(&self, frame: wgpu::SurfaceTexture, clear: Color) {
-        let view = frame
+    fn draw_and_present(
+        &mut self,
+        target: wgpu::SurfaceTexture,
+        frame: &Frame,
+        viewport: &Viewport,
+    ) {
+        let view = target
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-
-        // An sRGB surface expects linear values and converts them on write.
-        let clear = if self.config.format.is_srgb() {
-            clear.to_linear()
-        } else {
-            clear
-        };
+        self.renderer
+            .prepare(&self.device, &self.queue, frame, viewport);
 
         let mut encoder = self
             .device
@@ -134,24 +144,27 @@ impl Gpu {
                 label: Some("frame encoder"),
             });
         {
-            let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("clear pass"),
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("main pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(clear.into()),
+                        // Black fills the letterbox bars; the view itself is
+                        // covered by the frame's clear color.
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
                 ..Default::default()
             });
+            self.renderer.draw(&mut pass, viewport);
         }
 
         self.queue.submit([encoder.finish()]);
         self.window.pre_present_notify();
-        self.queue.present(frame);
+        self.queue.present(target);
     }
 
     fn recreate_surface(&mut self) {

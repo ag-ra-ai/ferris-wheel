@@ -12,13 +12,20 @@ use winit::window::{Window, WindowId};
 use crate::game::{Context, Frame};
 use crate::gpu::Gpu;
 use crate::time::FixedTimestep;
-use crate::{Config, Error, Game};
+use crate::viewport::Viewport;
+use crate::{Config, Error, Game, Vec2};
 
 pub(crate) fn run<G: Game>(config: Config, game: G) -> Result<(), Error> {
     let event_loop = EventLoop::new()?;
     let timestep = FixedTimestep::new(config.updates_per_second);
+    let (w, h) = config.resolution;
+    let view_size = Vec2::new(w.max(1) as f32, h.max(1) as f32);
+    // Placeholder until the window exists and reports its real size.
+    let viewport = Viewport::fit(view_size, w.max(1), h.max(1));
     let mut app = App {
-        ctx: Context::new(timestep.step()),
+        ctx: Context::new(timestep.step(), viewport),
+        frame: Frame::new(view_size),
+        viewport,
         timestep,
         last_frame: Instant::now(),
         config,
@@ -37,6 +44,9 @@ struct App<G> {
     config: Config,
     game: G,
     ctx: Context,
+    /// Reused every frame so its rectangle list keeps its allocation.
+    frame: Frame,
+    viewport: Viewport,
     timestep: FixedTimestep,
     last_frame: Instant,
     gpu: Option<Gpu>,
@@ -60,6 +70,14 @@ impl<G: Game> App<G> {
         Gpu::new(instance, window)
     }
 
+    fn set_viewport(&mut self, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return; // minimized; keep the last good viewport
+        }
+        self.viewport = Viewport::fit(self.ctx.view_size, width, height);
+        self.ctx.input.set_viewport(self.viewport);
+    }
+
     /// Runs any due updates, then draws one frame.
     fn frame(&mut self, event_loop: &ActiveEventLoop) {
         let now = Instant::now();
@@ -75,10 +93,10 @@ impl<G: Game> App<G> {
             }
         }
 
-        let mut frame = Frame::new();
-        self.game.draw(&mut frame);
+        self.frame.reset();
+        self.game.draw(&mut self.frame);
         if let Some(gpu) = self.gpu.as_mut() {
-            gpu.render(frame.clear_color);
+            gpu.render(&self.frame, &self.viewport);
             // Ask for the next frame right away; vsync paces the loop.
             gpu.window().request_redraw();
         }
@@ -93,6 +111,8 @@ impl<G: Game> ApplicationHandler for App<G> {
         }
         match self.init(event_loop) {
             Ok(gpu) => {
+                let (w, h) = gpu.size();
+                self.set_viewport(w, h);
                 gpu.window().request_redraw();
                 self.gpu = Some(gpu);
                 // Don't count window/GPU setup time as game time.
@@ -109,12 +129,13 @@ impl<G: Game> ApplicationHandler for App<G> {
         let Some(gpu) = self.gpu.as_mut() else {
             return;
         };
-        self.ctx
-            .input
-            .handle_event(&event, gpu.window().scale_factor());
+        self.ctx.input.handle_event(&event);
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => gpu.resize(size.width, size.height),
+            WindowEvent::Resized(size) => {
+                gpu.resize(size.width, size.height);
+                self.set_viewport(size.width, size.height);
+            }
             WindowEvent::RedrawRequested => self.frame(event_loop),
             _ => {}
         }

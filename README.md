@@ -20,17 +20,23 @@ build with the same dependency versions.
 Rendering uses [wgpu](https://wgpu.rs), so you need a GPU driver with Vulkan,
 Metal, DirectX 12 or OpenGL ES support. On Linux, the window system libraries are
 loaded at runtime and are present on any desktop install: `libxkbcommon` plus
-Wayland (`libwayland-client`) or X11 (`libX11`, `libXcursor`, `libXrandr`, `libXi`).
-No `-dev` packages are needed to build.
+Wayland (`libwayland-client`) or X11 (`libX11`, `libXcursor`, `libXrandr`, `libXi`,
+`libxkbcommon-x11`). No `-dev` packages are needed to build.
+
+Some tests draw on the GPU. Without a GPU, install a software driver
+(`mesa-vulkan-drivers` on Debian/Ubuntu) and run with `WGPU_BACKEND=vulkan`, as
+CI does.
 
 ## Examples
 
 ```sh
 cargo run --locked --example clear   # space cycles the background color, esc quits
+cargo run --locked --example rects   # move a box with arrows/WASD in a 320x180 view
 ```
 
 Set `RUST_LOG=info` to see which GPU and graphics backend are used, and
-`WGPU_BACKEND=gl` (or `vulkan`, `metal`, `dx12`) to force a backend.
+`WGPU_BACKEND=vulkan` (or `gl`, `metal`, `dx12`) to force a backend. On NVIDIA
+with Wayland, the `gl` backend can't present to the window; use Vulkan there.
 
 ## Development
 
@@ -48,15 +54,19 @@ CI runs the same commands on every push and pull request
 ```
 crates/ferris_wheel/
 ├── src/
-│   ├── lib.rs     public API: Config, run()
-│   ├── game.rs    Game trait, Context (update), Frame (draw)
-│   ├── app.rs     window, event loop, fixed-timestep game loop
-│   ├── time.rs    fixed-timestep accumulator
-│   ├── input.rs   keyboard and mouse state
-│   ├── gpu.rs     GPU setup and drawing (wgpu)
-│   ├── color.rs   Color type
-│   └── error.rs   Error type
-└── examples/      runnable demos
+│   ├── lib.rs        public API: Config, run()
+│   ├── game.rs       Game trait, Context (update), Frame (draw)
+│   ├── app.rs        window, event loop, fixed-timestep game loop
+│   ├── time.rs       fixed-timestep accumulator
+│   ├── input.rs      keyboard and mouse state
+│   ├── math.rs       Vec2, Rect
+│   ├── viewport.rs   fits the fixed-size view into the window (letterboxing)
+│   ├── gpu.rs        GPU device and window surface (wgpu)
+│   ├── renderer.rs   batched rectangle drawing
+│   ├── shaders/      WGSL shaders
+│   ├── color.rs      Color type
+│   └── error.rs      Error type
+└── examples/         runnable demos
 ```
 
 ## License
