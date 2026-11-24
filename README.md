@@ -26,7 +26,7 @@ No `-dev` packages are needed to build.
 ## Examples
 
 ```sh
-cargo run --locked --example clear   # open a window and clear it to a color
+cargo run --locked --example clear   # space cycles the background color, esc quits
 ```
 
 Set `RUST_LOG=info` to see which GPU and graphics backend are used, and
@@ -49,7 +49,10 @@ CI runs the same commands on every push and pull request
 crates/ferris_wheel/
 ├── src/
 │   ├── lib.rs     public API: Config, run()
-│   ├── app.rs     window and event loop (winit)
+│   ├── game.rs    Game trait, Context (update), Frame (draw)
+│   ├── app.rs     window, event loop, fixed-timestep game loop
+│   ├── time.rs    fixed-timestep accumulator
+│   ├── input.rs   keyboard and mouse state
 │   ├── gpu.rs     GPU setup and drawing (wgpu)
 │   ├── color.rs   Color type
 │   └── error.rs   Error type

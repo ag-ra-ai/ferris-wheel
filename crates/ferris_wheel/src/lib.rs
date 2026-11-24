@@ -1,25 +1,39 @@
 //! ferris-wheel: a simple 2D game engine.
 //!
-//! Open a window and start the engine with [`run`]:
+//! Implement [`Game`] and start it with [`run`]:
 //!
 //! ```no_run
-//! use ferris_wheel::{Color, Config};
+//! use ferris_wheel::{Color, Config, Context, Frame, Game, Key};
 //!
-//! ferris_wheel::run(Config {
-//!     title: "My game".into(),
-//!     clear_color: Color::rgb(0.1, 0.1, 0.15),
-//!     ..Config::default()
-//! })
-//! .unwrap();
+//! struct MyGame;
+//!
+//! impl Game for MyGame {
+//!     fn update(&mut self, ctx: &mut Context) {
+//!         if ctx.input().key_pressed(Key::Escape) {
+//!             ctx.quit();
+//!         }
+//!     }
+//!
+//!     fn draw(&mut self, frame: &mut Frame) {
+//!         frame.clear(Color::rgb(0.1, 0.1, 0.15));
+//!     }
+//! }
+//!
+//! ferris_wheel::run(Config::default(), MyGame).unwrap();
 //! ```
 
 mod app;
 mod color;
 mod error;
+mod game;
 mod gpu;
+mod input;
+mod time;
 
 pub use color::Color;
 pub use error::Error;
+pub use game::{Context, Frame, Game};
+pub use input::{Input, Key, MouseButton};
 
 /// The engine version, taken from `Cargo.toml`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -33,8 +47,8 @@ pub struct Config {
     pub width: u32,
     /// Initial window height in logical pixels.
     pub height: u32,
-    /// Color the screen is cleared to every frame.
-    pub clear_color: Color,
+    /// How many times per second [`Game::update`] runs.
+    pub updates_per_second: u32,
 }
 
 impl Default for Config {
@@ -43,16 +57,17 @@ impl Default for Config {
             title: "ferris-wheel".into(),
             width: 1280,
             height: 720,
-            clear_color: Color::BLACK,
+            updates_per_second: 60,
         }
     }
 }
 
-/// Opens a window and runs the engine until the window is closed.
+/// Opens a window and runs `game` until the window is closed or the game
+/// calls [`Context::quit`].
 ///
 /// This blocks the calling thread. It must be called from the main thread.
-pub fn run(config: Config) -> Result<(), Error> {
-    app::run(config)
+pub fn run<G: Game>(config: Config, game: G) -> Result<(), Error> {
+    app::run(config, game)
 }
 
 #[cfg(test)]
