@@ -32,6 +32,7 @@ CI does.
 ```sh
 cargo run --locked --example clear   # space cycles the background color, esc quits
 cargo run --locked --example rects   # move a box with arrows/WASD in a 320x180 view
+cargo run --locked --example sprites # animated sprite: arrows/AD walk, space jumps
 ```
 
 Set `RUST_LOG=info` to see which GPU and graphics backend are used, and
@@ -62,11 +63,13 @@ crates/ferris_wheel/
 │   ├── math.rs       Vec2, Rect
 │   ├── viewport.rs   fits the fixed-size view into the window (letterboxing)
 │   ├── gpu.rs        GPU device and window surface (wgpu)
-│   ├── renderer.rs   batched rectangle drawing
+│   ├── renderer.rs   batched sprite and rectangle drawing
+│   ├── texture.rs    Texture: PNG loading, raw RGBA
 │   ├── shaders/      WGSL shaders
 │   ├── color.rs      Color type
 │   └── error.rs      Error type
 └── examples/         runnable demos
+    └── assets/       images used by the examples
 ```
 
 ## License

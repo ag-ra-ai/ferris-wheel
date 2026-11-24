@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use crate::viewport::Viewport;
-use crate::{Color, Input, Rect, Vec2};
+use crate::{Color, Input, Rect, Texture, Vec2};
 
 /// A game the engine can run. See [`crate::run`].
 pub trait Game {
@@ -71,11 +71,41 @@ pub struct Frame {
     view_size: Vec2,
 }
 
-/// A filled rectangle waiting to be drawn.
-#[derive(Debug, Clone, Copy)]
+/// A rectangle waiting to be drawn: a sprite, or a plain color when
+/// `texture` is `None`.
+#[derive(Debug, Clone)]
 pub(crate) struct Quad {
     pub(crate) rect: Rect,
+    /// Texture coordinates (0..1); a negative size flips the image.
+    pub(crate) uv: Rect,
     pub(crate) color: Color,
+    pub(crate) texture: Option<Texture>,
+}
+
+/// Options for [`Frame::draw_sprite_with`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpriteParams {
+    /// Part of the texture to draw, in pixels. `None` draws the whole
+    /// texture. Use this to pick one frame from a sprite sheet.
+    pub source: Option<Rect>,
+    /// Multiplied with every pixel. White leaves the image unchanged; lower
+    /// alpha makes it see-through.
+    pub tint: Color,
+    /// Mirror the image left-to-right.
+    pub flip_x: bool,
+    /// Mirror the image top-to-bottom.
+    pub flip_y: bool,
+}
+
+impl Default for SpriteParams {
+    fn default() -> Self {
+        Self {
+            source: None,
+            tint: Color::WHITE,
+            flip_x: false,
+            flip_y: false,
+        }
+    }
 }
 
 impl Frame {
@@ -105,7 +135,49 @@ impl Frame {
 
     /// Draws a filled rectangle.
     pub fn fill_rect(&mut self, rect: Rect, color: Color) {
-        self.quads.push(Quad { rect, color });
+        self.quads.push(Quad {
+            rect,
+            uv: Rect::new(0.0, 0.0, 1.0, 1.0),
+            color,
+            texture: None,
+        });
+    }
+
+    /// Draws the whole `texture` stretched to fill `dest`.
+    pub fn draw_sprite(&mut self, texture: &Texture, dest: Rect) {
+        self.draw_sprite_with(texture, dest, SpriteParams::default());
+    }
+
+    /// Draws `texture` into `dest` with a source region, tint or flip.
+    pub fn draw_sprite_with(&mut self, texture: &Texture, dest: Rect, params: SpriteParams) {
+        let source =
+            params
+                .source
+                .unwrap_or(Rect::new(0.0, 0.0, texture.size().x, texture.size().y));
+        let mut uv = Rect {
+            pos: Vec2::new(
+                source.pos.x / texture.size().x,
+                source.pos.y / texture.size().y,
+            ),
+            size: Vec2::new(
+                source.size.x / texture.size().x,
+                source.size.y / texture.size().y,
+            ),
+        };
+        if params.flip_x {
+            uv.pos.x += uv.size.x;
+            uv.size.x = -uv.size.x;
+        }
+        if params.flip_y {
+            uv.pos.y += uv.size.y;
+            uv.size.y = -uv.size.y;
+        }
+        self.quads.push(Quad {
+            rect: dest,
+            uv,
+            color: params.tint,
+            texture: Some(texture.clone()),
+        });
     }
 }
 
@@ -146,5 +218,40 @@ mod tests {
         assert!(frame.quads.is_empty());
         assert_eq!(frame.clear_color, Color::BLACK);
         assert_eq!(frame.view_size(), VIEW);
+    }
+
+    fn sprite_uv(params: SpriteParams) -> Rect {
+        let texture = Texture::from_rgba8(64, 16, vec![0; 64 * 16 * 4]).unwrap();
+        let mut frame = Frame::new(VIEW);
+        frame.draw_sprite_with(&texture, Rect::new(0.0, 0.0, 16.0, 16.0), params);
+        frame.quads[0].uv
+    }
+
+    #[test]
+    fn whole_texture_uses_full_uv_range() {
+        assert_eq!(
+            sprite_uv(SpriteParams::default()),
+            Rect::new(0.0, 0.0, 1.0, 1.0)
+        );
+    }
+
+    #[test]
+    fn source_region_maps_to_uv() {
+        let uv = sprite_uv(SpriteParams {
+            source: Some(Rect::new(16.0, 0.0, 16.0, 16.0)),
+            ..Default::default()
+        });
+        assert_eq!(uv, Rect::new(0.25, 0.0, 0.25, 1.0));
+    }
+
+    #[test]
+    fn flips_swap_uv_edges() {
+        let uv = sprite_uv(SpriteParams {
+            source: Some(Rect::new(16.0, 0.0, 16.0, 16.0)),
+            flip_x: true,
+            flip_y: true,
+            ..Default::default()
+        });
+        assert_eq!(uv, Rect::new(0.5, 1.0, -0.25, -1.0));
     }
 }

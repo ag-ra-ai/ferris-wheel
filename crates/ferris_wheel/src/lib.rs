@@ -30,14 +30,16 @@ mod gpu;
 mod input;
 mod math;
 mod renderer;
+mod texture;
 mod time;
 mod viewport;
 
 pub use color::Color;
 pub use error::Error;
-pub use game::{Context, Frame, Game};
+pub use game::{Context, Frame, Game, SpriteParams};
 pub use input::{Input, Key, MouseButton};
 pub use math::{Rect, Vec2};
+pub use texture::Texture;
 
 /// The engine version, taken from `Cargo.toml`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

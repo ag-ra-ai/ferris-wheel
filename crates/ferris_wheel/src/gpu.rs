@@ -59,7 +59,7 @@ impl Gpu {
         // Fifo (vsync) is the one present mode every platform must support.
         config.present_mode = wgpu::PresentMode::Fifo;
         surface.configure(&device, &config);
-        let renderer = QuadRenderer::new(&device, config.format);
+        let renderer = QuadRenderer::new(&device, &queue, config.format);
 
         Ok(Self {
             instance,
