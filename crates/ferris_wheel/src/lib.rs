@@ -47,11 +47,12 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Settings for the game window.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Text shown in the window's title bar.
+    /// Text shown in the window's title bar (the page title in browsers).
     pub title: String,
-    /// Initial window width in logical pixels.
+    /// Initial window width in logical pixels. Not used in browsers, where
+    /// the page's CSS sizes the canvas.
     pub width: u32,
-    /// Initial window height in logical pixels.
+    /// Initial window height in logical pixels. Not used in browsers.
     pub height: u32,
     /// Size of the game view in world units (width, height).
     ///
@@ -78,8 +79,12 @@ impl Default for Config {
 /// Opens a window and runs `game` until the window is closed or the game
 /// calls [`Context::quit`].
 ///
-/// This blocks the calling thread. It must be called from the main thread.
-pub fn run<G: Game>(config: Config, game: G) -> Result<(), Error> {
+/// On desktop this blocks the calling thread, which must be the main thread.
+///
+/// In a browser (wasm32) it adds a canvas to the page and returns `Ok(())`
+/// right away; the game keeps running in the browser's event loop. GPU setup
+/// errors are then reported in the browser console instead of returned.
+pub fn run<G: Game + 'static>(config: Config, game: G) -> Result<(), Error> {
     app::run(config, game)
 }
 

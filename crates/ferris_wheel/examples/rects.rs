@@ -7,6 +7,8 @@
 //!
 //! Run with: `cargo run --example rects`
 
+mod support;
+
 use ferris_wheel::{Color, Config, Context, Frame, Game, Key, Rect, Vec2};
 
 const TILE: f32 = 20.0;
@@ -113,7 +115,7 @@ impl Game for RectsDemo {
 }
 
 fn main() -> Result<(), ferris_wheel::Error> {
-    env_logger::init();
+    support::init_logging();
     let config = Config {
         title: "ferris-wheel: rects (arrows/WASD move, esc quits)".into(),
         resolution: (320, 180),

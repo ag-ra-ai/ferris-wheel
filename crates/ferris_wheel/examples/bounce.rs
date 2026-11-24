@@ -10,6 +10,8 @@
 //!
 //! Run with: `cargo run --example bounce`
 
+mod support;
+
 use ferris_wheel::{Color, Config, Context, Frame, Game, Key, Rect, Vec2};
 
 const VIEW: Vec2 = Vec2::new(320.0, 180.0);
@@ -192,7 +194,7 @@ impl Game for Bounce {
 }
 
 fn main() -> Result<(), ferris_wheel::Error> {
-    env_logger::init();
+    support::init_logging();
     let config = Config {
         title: "ferris-wheel: bounce (arrows/AD move, space = ball, I = interpolation)".into(),
         resolution: (VIEW.x as u32, VIEW.y as u32),

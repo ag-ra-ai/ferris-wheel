@@ -1,7 +1,9 @@
 //! Clears the window to a color. Space cycles colors, Escape quits.
 //!
 //! Run with: `cargo run --example clear`
-//! Set `RUST_LOG=info` to see which GPU is used.
+//! Set `RUST_LOG=info` to see which GPU is used. In a browser: `cargo xtask web clear`.
+
+mod support;
 
 use ferris_wheel::{Color, Config, Context, Frame, Game, Key};
 
@@ -32,7 +34,7 @@ impl Game for ClearDemo {
 }
 
 fn main() -> Result<(), ferris_wheel::Error> {
-    env_logger::init();
+    support::init_logging();
     let config = Config {
         title: "ferris-wheel: clear (space = next color, esc = quit)".into(),
         ..Config::default()

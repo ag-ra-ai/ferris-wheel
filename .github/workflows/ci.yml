@@ -44,3 +44,24 @@ jobs:
 
       - name: Build examples
         run: cargo build --workspace --examples --locked
+
+  web:
+    name: web (wasm32) build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      # Installs the pinned toolchain plus the wasm32 target it lists.
+      - name: Install Rust toolchain
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy (wasm32)
+        run: cargo clippy --package ferris_wheel --lib --examples --target wasm32-unknown-unknown --locked
+
+      - name: Build every example for the web
+        run: |
+          for f in crates/ferris_wheel/examples/*.rs; do
+            cargo xtask web "$(basename "$f" .rs)" --no-serve
+          done

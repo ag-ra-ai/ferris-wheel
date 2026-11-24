@@ -1,0 +1,3 @@
+[alias]
+# Project tasks, e.g. `cargo xtask web bounce`. See crates/xtask.
+xtask = "run --locked --package xtask --"

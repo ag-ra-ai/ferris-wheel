@@ -17,6 +17,14 @@ pollster = "1.0.3"
 log = "0.4.35"
 env_logger = "0.11.12"
 png = "0.18.1"
+web-time = "1.1.0"
+# Web only. wasm-bindgen and wasm-bindgen-cli-support (used by xtask) must be
+# the exact same version, so both are pinned with `=`.
+wasm-bindgen = "=0.2.130"
+wasm-bindgen-cli-support = "=0.2.130"
+wasm-bindgen-futures = "0.4.80"
+console_error_panic_hook = "0.1.7"
+console_log = "1.1.0"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

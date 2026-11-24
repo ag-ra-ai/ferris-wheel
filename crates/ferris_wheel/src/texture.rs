@@ -58,6 +58,9 @@ impl Texture {
     }
 
     /// A texture from a PNG file on disk.
+    ///
+    /// Browsers have no file system, so this always fails there; embed images
+    /// with `include_bytes!` and use [`Texture::from_png_bytes`] instead.
     pub fn from_png_file(path: impl AsRef<Path>) -> Result<Self, Error> {
         let path = path.as_ref();
         let bytes = std::fs::read(path)

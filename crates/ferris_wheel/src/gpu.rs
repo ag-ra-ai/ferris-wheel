@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use winit::event_loop::OwnedDisplayHandle;
 use winit::window::Window;
 
 use crate::renderer::QuadRenderer;
@@ -15,51 +16,78 @@ pub(crate) struct Gpu {
     queue: wgpu::Queue,
     surface: wgpu::Surface<'static>,
     config: wgpu::SurfaceConfiguration,
+    /// sRGB format the frame is drawn in. Same as `config.format`, or its sRGB
+    /// view when the surface itself has no sRGB format (e.g. WebGPU canvases).
+    view_format: wgpu::TextureFormat,
     window: Arc<Window>,
     renderer: QuadRenderer,
 }
 
 impl Gpu {
-    pub(crate) fn new(instance: wgpu::Instance, window: Arc<Window>) -> Result<Self, Error> {
+    /// Sets up the GPU for `window`. Async because browsers can't block while
+    /// the GPU starts; on desktop the caller just waits for it.
+    pub(crate) async fn new(
+        window: Arc<Window>,
+        display: OwnedDisplayHandle,
+    ) -> Result<Self, Error> {
+        // The display handle is required for GLES on Wayland and harmless elsewhere.
+        // `_from_env` lets WGPU_BACKEND etc. override settings when debugging.
+        let desc = wgpu::InstanceDescriptor::new_with_display_handle_from_env(Box::new(display));
+        // In browsers, use WebGPU if available and fall back to WebGL2.
+        #[cfg(target_arch = "wasm32")]
+        let instance = wgpu::util::new_instance_with_webgpu_detection(desc).await;
+        #[cfg(not(target_arch = "wasm32"))]
+        let instance = wgpu::Instance::new(desc);
+
         let surface = instance
             .create_surface(window.clone())
             .map_err(|e| Error::Gpu(e.to_string()))?;
 
-        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::default(),
-            force_fallback_adapter: false,
-            compatible_surface: Some(&surface),
-            // Bucketing hides exact GPU limits from untrusted code; not needed here.
-            apply_limit_buckets: false,
-        }))
-        .map_err(|e| Error::Gpu(e.to_string()))?;
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                force_fallback_adapter: false,
+                compatible_surface: Some(&surface),
+                // Bucketing hides exact GPU limits from untrusted code; not needed here.
+                apply_limit_buckets: false,
+            })
+            .await
+            .map_err(|e| Error::Gpu(e.to_string()))?;
 
         let info = adapter.get_info();
         log::info!("using GPU: {} ({:?})", info.name, info.backend);
 
-        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-            label: Some("ferris_wheel device"),
-            // Downlevel limits keep us compatible with older GPUs and GLES.
-            required_limits:
-                wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()),
-            ..Default::default()
-        }))
-        .map_err(|e| Error::Gpu(e.to_string()))?;
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("ferris_wheel device"),
+                // Downlevel limits keep us compatible with older GPUs and WebGL2.
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                    .using_resolution(adapter.limits()),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| Error::Gpu(e.to_string()))?;
 
         let size = window.inner_size();
         let mut config = surface
             .get_default_config(&adapter, size.width.max(1), size.height.max(1))
             .ok_or_else(|| Error::Gpu("the GPU cannot draw to this window".into()))?;
 
-        // Prefer an sRGB format so the GPU handles gamma for us.
+        // Draw in an sRGB format so the GPU handles gamma for us. Prefer a
+        // surface format that is sRGB already; otherwise draw through an sRGB
+        // view of the surface (WebGPU canvases only offer non-sRGB formats).
         let caps = surface.get_capabilities(&adapter);
         if let Some(srgb) = caps.formats.iter().copied().find(|f| f.is_srgb()) {
             config.format = srgb;
         }
+        let view_format = config.format.add_srgb_suffix();
+        if view_format != config.format {
+            config.view_formats.push(view_format);
+        }
         // Fifo (vsync) is the one present mode every platform must support.
         config.present_mode = wgpu::PresentMode::Fifo;
         surface.configure(&device, &config);
-        let renderer = QuadRenderer::new(&device, &queue, config.format);
+        let renderer = QuadRenderer::new(&device, &queue, view_format);
 
         Ok(Self {
             instance,
@@ -67,6 +95,7 @@ impl Gpu {
             queue,
             surface,
             config,
+            view_format,
             window,
             renderer,
         })
@@ -132,9 +161,10 @@ impl Gpu {
         frame: &Frame,
         viewport: &Viewport,
     ) {
-        let view = target
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let view = target.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.view_format),
+            ..Default::default()
+        });
         self.renderer
             .prepare(&self.device, &self.queue, frame, viewport);
 

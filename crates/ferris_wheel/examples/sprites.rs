@@ -7,6 +7,8 @@
 //!
 //! Run with: `cargo run --example sprites`
 
+mod support;
+
 use ferris_wheel::{Color, Config, Context, Frame, Game, Key, Rect, SpriteParams, Texture, Vec2};
 
 /// 4 frames of 16x16, side by side. Embedded so the example runs from any
@@ -169,7 +171,7 @@ impl Game for SpritesDemo {
 }
 
 fn main() -> Result<(), ferris_wheel::Error> {
-    env_logger::init();
+    support::init_logging();
     let config = Config {
         title: "ferris-wheel: sprites (arrows/AD walk, space jumps, esc quits)".into(),
         resolution: (320, 180),
