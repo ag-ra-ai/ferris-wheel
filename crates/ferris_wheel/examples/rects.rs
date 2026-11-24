@@ -13,6 +13,8 @@ const TILE: f32 = 20.0;
 const SPEED: f32 = 90.0; // world units per second
 
 struct RectsDemo {
+    /// Player position before the last update, for smooth drawing.
+    player_prev: Vec2,
     player: Rect,
     target: Rect,
     touching: bool,
@@ -22,6 +24,7 @@ struct RectsDemo {
 impl RectsDemo {
     fn new() -> Self {
         Self {
+            player_prev: Vec2::new(40.0, 80.0),
             player: Rect::new(40.0, 80.0, 16.0, 16.0),
             target: Rect::new(240.0, 70.0, 30.0, 40.0),
             touching: false,
@@ -48,6 +51,7 @@ impl Game for RectsDemo {
             dir.y += 1.0;
         }
         // Normalize so diagonal movement isn't faster.
+        self.player_prev = self.player.pos;
         self.player.pos += dir.normalize_or_zero() * SPEED * ctx.dt();
 
         // Keep the player inside the view.
@@ -92,7 +96,14 @@ impl Game for RectsDemo {
         } else {
             Color::hex(0xbf616a)
         };
-        frame.fill_rect(self.player, player_color);
+        // Draw between the last two updates so motion is smooth on fast screens.
+        let player = Rect {
+            pos: self
+                .player_prev
+                .lerp(self.player.pos, frame.interpolation()),
+            ..self.player
+        };
+        frame.fill_rect(player, player_color);
         // A translucent bar across the top, to show alpha blending.
         frame.fill_rect(
             Rect::new(0.0, 0.0, size.x, 12.0),

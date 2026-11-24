@@ -28,6 +28,12 @@ impl Vec2 {
         self.dot(self).sqrt()
     }
 
+    /// The point `t` of the way from `self` to `other`: `self` at 0,
+    /// `other` at 1.
+    pub fn lerp(self, other: Self, t: f32) -> Self {
+        self + (other - self) * t
+    }
+
     /// This vector scaled to length 1, or zero if it has no length.
     pub fn normalize_or_zero(self) -> Self {
         let len = self.length();
@@ -164,6 +170,15 @@ mod tests {
         assert_eq!(b / 2.0, Vec2::new(1.5, 2.5));
         assert_eq!(-a, Vec2::new(-1.0, -2.0));
         assert_eq!(a.dot(b), 13.0);
+    }
+
+    #[test]
+    fn lerp_blends_between_points() {
+        let a = Vec2::new(0.0, 10.0);
+        let b = Vec2::new(10.0, 20.0);
+        assert_eq!(a.lerp(b, 0.0), a);
+        assert_eq!(a.lerp(b, 1.0), b);
+        assert_eq!(a.lerp(b, 0.25), Vec2::new(2.5, 12.5));
     }
 
     #[test]

@@ -94,6 +94,7 @@ impl<G: Game> App<G> {
         }
 
         self.frame.reset();
+        self.frame.interpolation = self.timestep.interpolation();
         self.game.draw(&mut self.frame);
         if let Some(gpu) = self.gpu.as_mut() {
             gpu.render(&self.frame, &self.viewport);

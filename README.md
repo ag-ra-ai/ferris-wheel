@@ -33,6 +33,7 @@ CI does.
 cargo run --locked --example clear   # space cycles the background color, esc quits
 cargo run --locked --example rects   # move a box with arrows/WASD in a 320x180 view
 cargo run --locked --example sprites # animated sprite: arrows/AD walk, space jumps
+cargo run --locked --example bounce  # paddle and balls; I toggles interpolation
 ```
 
 Set `RUST_LOG=info` to see which GPU and graphics backend are used, and

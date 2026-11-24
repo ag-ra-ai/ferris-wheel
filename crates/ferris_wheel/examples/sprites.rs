@@ -26,6 +26,8 @@ const GRAVITY: f32 = 700.0;
 struct SpritesDemo {
     blob: Texture,
     ground: Texture,
+    /// Position before the last update, for smooth drawing.
+    prev_pos: Vec2,
     pos: Vec2,
     velocity_y: f32,
     facing_left: bool,
@@ -38,6 +40,7 @@ impl SpritesDemo {
         Ok(Self {
             blob: Texture::from_png_bytes(BLOB_PNG)?,
             ground: ground_tiles()?,
+            prev_pos: Vec2::new(144.0, GROUND_Y - FRAME_SIZE * SCALE),
             pos: Vec2::new(144.0, GROUND_Y - FRAME_SIZE * SCALE),
             velocity_y: 0.0,
             facing_left: false,
@@ -77,6 +80,7 @@ impl Game for SpritesDemo {
     fn update(&mut self, ctx: &mut Context) {
         let input = ctx.input();
         let dt = ctx.dt();
+        self.prev_pos = self.pos;
 
         let mut dir = 0.0;
         if input.key_held(Key::ArrowLeft) || input.key_held(Key::KeyA) {
@@ -150,8 +154,9 @@ impl Game for SpritesDemo {
         } else {
             1
         };
+        // Draw between the last two updates so motion is smooth on fast screens.
         let dest = Rect {
-            pos: self.pos,
+            pos: self.prev_pos.lerp(self.pos, frame.interpolation()),
             size: Vec2::new(FRAME_SIZE, FRAME_SIZE) * SCALE,
         };
         let params = SpriteParams {

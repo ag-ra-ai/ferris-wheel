@@ -68,6 +68,7 @@ impl Context {
 pub struct Frame {
     pub(crate) clear_color: Color,
     pub(crate) quads: Vec<Quad>,
+    pub(crate) interpolation: f32,
     view_size: Vec2,
 }
 
@@ -113,6 +114,7 @@ impl Frame {
         Self {
             clear_color: Color::BLACK,
             quads: Vec::new(),
+            interpolation: 0.0,
             view_size,
         }
     }
@@ -126,6 +128,18 @@ impl Frame {
     /// Size of the game view in world units.
     pub fn view_size(&self) -> Vec2 {
         self.view_size
+    }
+
+    /// How far this frame is between the last update and the next one, from
+    /// 0 up to (but not including) 1.
+    ///
+    /// Updates run at a fixed rate, but frames are drawn at the screen's
+    /// refresh rate. Drawing moving things at the position from the last
+    /// update makes them stutter on screens faster than the update rate.
+    /// Instead, keep the position from before the last update too, and draw
+    /// at `previous.lerp(current, frame.interpolation())`.
+    pub fn interpolation(&self) -> f32 {
+        self.interpolation
     }
 
     /// Fills the whole view with `color`. Black if not called.
