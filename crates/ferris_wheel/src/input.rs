@@ -30,6 +30,7 @@ pub struct Input {
     /// resize between mouse moves still gives the right world position.
     cursor: Option<Vec2>,
     viewport: Viewport,
+    focused: bool,
 }
 
 impl Input {
@@ -70,12 +71,22 @@ impl Input {
         self.cursor.map(|c| self.viewport.window_to_world(c))
     }
 
+    /// True while the window has keyboard focus. When the player switches
+    /// to another window, this turns false and every held key and button is
+    /// released. A good moment to pause the game.
+    ///
+    /// In a browser, the game's canvas gets focus when the player clicks it.
+    pub fn has_focus(&self) -> bool {
+        self.focused
+    }
+
     pub(crate) fn new(viewport: Viewport) -> Self {
         Self {
             keys: Buttons::default(),
             mouse_buttons: Buttons::default(),
             cursor: None,
             viewport,
+            focused: true,
         }
     }
 
@@ -108,7 +119,11 @@ impl Input {
             WindowEvent::CursorLeft { .. } => self.cursor = None,
             // We won't see the key-up events while unfocused, so let go of
             // everything now rather than leave keys stuck down.
-            WindowEvent::Focused(false) => self.release_all(),
+            WindowEvent::Focused(false) => {
+                self.focused = false;
+                self.release_all();
+            }
+            WindowEvent::Focused(true) => self.focused = true,
             _ => {}
         }
     }
@@ -238,11 +253,16 @@ mod tests {
         input.mouse_buttons.down(MouseButton::Left);
         input.end_update();
 
+        assert!(input.has_focus());
         input.handle_event(&WindowEvent::Focused(false));
+        assert!(!input.has_focus());
         assert!(!input.key_held(Key::ArrowLeft));
         assert!(input.key_released(Key::ArrowLeft));
         assert!(!input.mouse_held(MouseButton::Left));
         assert!(input.mouse_released(MouseButton::Left));
+
+        input.handle_event(&WindowEvent::Focused(true));
+        assert!(input.has_focus());
     }
 
     #[test]

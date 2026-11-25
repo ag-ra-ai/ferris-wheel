@@ -124,7 +124,8 @@ fn decibels(volume: f32) -> Decibels {
     }
 }
 
-/// How long music fades out when stopped or replaced, so it doesn't click.
+/// How long music fades when stopped, replaced or its volume changes, so it
+/// doesn't click.
 const MUSIC_FADE: Duration = Duration::from_millis(100);
 
 /// The engine's audio output. Generic over the kira backend so tests can
@@ -133,6 +134,8 @@ pub(crate) struct Audio<B: Backend = DefaultBackend> {
     output: Output<B>,
     /// Master volume, as set by the game.
     volume: f32,
+    /// Scales the music on top of its own `SoundParams::volume`.
+    music_volume: f32,
     /// The music the game asked for, kept even before the output starts so
     /// it can begin then.
     music: Option<Music>,
@@ -164,6 +167,7 @@ where
         Self {
             output: Output::Waiting,
             volume: 1.0,
+            music_volume: 1.0,
             music: None,
         }
     }
@@ -210,6 +214,10 @@ where
             // empty sound is never handed to it.
             Output::Running(_) if sound.is_empty() => None,
             Output::Running(manager) => {
+                let params = SoundParams {
+                    volume: params.volume * self.music_volume,
+                    ..params
+                };
                 let data = sound.with_params(params).loop_region(..);
                 manager
                     .play(data)
@@ -235,6 +243,26 @@ where
                 duration: MUSIC_FADE,
                 ..Tween::default()
             });
+        }
+    }
+
+    pub(crate) fn music_volume(&self) -> f32 {
+        self.music_volume
+    }
+
+    pub(crate) fn set_music_volume(&mut self, volume: f32) {
+        self.music_volume = volume.max(0.0);
+        if let Some(Music {
+            params,
+            handle: Some(handle),
+            ..
+        }) = &mut self.music
+        {
+            let tween = Tween {
+                duration: MUSIC_FADE,
+                ..Tween::default()
+            };
+            handle.set_volume(decibels(params.volume * self.music_volume), tween);
         }
     }
 
@@ -466,6 +494,36 @@ mod tests {
 
         audio.stop_music();
         assert_eq!(level_after(&mut audio, 0.5), (0.0, 0.0));
+    }
+
+    #[test]
+    fn music_volume_scales_current_and_later_music_only() {
+        let mut audio = started();
+        let half = SoundParams {
+            volume: 0.5,
+            ..SoundParams::default()
+        };
+        audio.play_music(&constant(0.8, 0.1), half);
+        audio.play(&constant(0.1, 2.0), SoundParams::default());
+        assert_near(level_after(&mut audio, 0.3).0, 0.5);
+
+        // The music fades to a quarter of its own volume; effects stay put.
+        audio.set_music_volume(0.25);
+        assert_eq!(audio.music_volume(), 0.25);
+        assert_near(level_after(&mut audio, 0.3).0, 0.2);
+
+        // New music keeps the music volume.
+        audio.play_music(&constant(0.8, 0.1), SoundParams::default());
+        assert_near(level_after(&mut audio, 0.3).0, 0.3);
+    }
+
+    #[test]
+    fn music_volume_set_before_start_applies() {
+        let mut audio = Audio::<Capture>::new();
+        audio.set_music_volume(0.5);
+        audio.play_music(&constant(0.4, 0.1), SoundParams::default());
+        audio.start();
+        assert_near(level_after(&mut audio, 0.3).0, 0.2);
     }
 
     #[test]

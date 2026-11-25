@@ -105,6 +105,19 @@ impl Context {
         self.audio.stop_music();
     }
 
+    /// The music volume, which scales music but not sound effects. Starts
+    /// at 1.0.
+    pub fn music_volume(&self) -> f32 {
+        self.audio.music_volume()
+    }
+
+    /// Sets the music volume, for the current music and any played later.
+    /// Playing music fades to the new volume over a tenth of a second, so
+    /// this also suits quieter music while the game is paused.
+    pub fn set_music_volume(&mut self, volume: f32) {
+        self.audio.set_music_volume(volume);
+    }
+
     /// The master volume, which scales all sounds and music. Starts at 1.0.
     pub fn volume(&self) -> f32 {
         self.audio.volume()

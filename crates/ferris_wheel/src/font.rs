@@ -1,7 +1,7 @@
 //! Bitmap fonts for [`crate::Frame::draw_text`].
 
 use std::collections::HashMap;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use crate::{Error, Rect, Texture, Vec2};
 
@@ -26,8 +26,9 @@ pub struct Font {
     glyph_size: Vec2,
     /// Gap between characters and between lines, in font pixels.
     spacing: Vec2,
-    /// Source rectangle of each character in the texture.
-    glyphs: HashMap<char, Rect>,
+    /// Source rectangle of each character in the texture. Shared, so
+    /// cloning a font is cheap.
+    glyphs: Arc<HashMap<char, Rect>>,
 }
 
 /// Options for [`crate::Frame::draw_text_with`].
@@ -109,7 +110,7 @@ impl Font {
             texture,
             glyph_size: Vec2::new(cell_width as f32, cell_height as f32),
             spacing: Vec2::new(1.0, 2.0),
-            glyphs,
+            glyphs: Arc::new(glyphs),
         })
     }
 
@@ -255,7 +256,7 @@ fn build_builtin(source: &str) -> Result<Font, String> {
         texture,
         glyph_size: Vec2::new(BUILTIN_GLYPH_W as f32, BUILTIN_GLYPH_H as f32),
         spacing: Vec2::new(1.0, 2.0),
-        glyphs: map,
+        glyphs: Arc::new(map),
     })
 }
 
