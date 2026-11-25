@@ -187,6 +187,10 @@ impl<G: Game> ApplicationHandler<GpuReady> for App<G> {
             return;
         }
         self.started = true;
+        // Browsers allow sound only after a click or key press; there the
+        // audio starts in `window_event` instead.
+        #[cfg(not(target_arch = "wasm32"))]
+        self.ctx.audio.start();
         match self.create_window(event_loop) {
             Ok(window) => self.start_gpu(event_loop, window),
             Err(e) => self.gpu_ready(event_loop, Err(e)),
@@ -202,6 +206,10 @@ impl<G: Game> ApplicationHandler<GpuReady> for App<G> {
             return;
         };
         self.ctx.input.handle_event(&event);
+        #[cfg(target_arch = "wasm32")]
+        if is_user_gesture(&event) {
+            self.ctx.audio.start();
+        }
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {
@@ -211,5 +219,18 @@ impl<G: Game> ApplicationHandler<GpuReady> for App<G> {
             WindowEvent::RedrawRequested => self.frame(event_loop),
             _ => {}
         }
+    }
+}
+
+/// Whether a browser counts `event` as the player interacting with the page,
+/// which unlocks sound.
+#[cfg(target_arch = "wasm32")]
+fn is_user_gesture(event: &WindowEvent) -> bool {
+    use winit::event::{ElementState, TouchPhase};
+    match event {
+        WindowEvent::KeyboardInput { event, .. } => event.state == ElementState::Pressed,
+        WindowEvent::MouseInput { state, .. } => *state == ElementState::Pressed,
+        WindowEvent::Touch(touch) => touch.phase == TouchPhase::Started,
+        _ => false,
     }
 }

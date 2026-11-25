@@ -11,6 +11,8 @@ pub enum Error {
     Gpu(String),
     /// An image could not be loaded or has invalid data.
     Texture(String),
+    /// A sound could not be loaded or has invalid data.
+    Audio(String),
 }
 
 impl fmt::Display for Error {
@@ -20,6 +22,7 @@ impl fmt::Display for Error {
             Self::Window(e) => write!(f, "could not create window: {e}"),
             Self::Gpu(msg) => write!(f, "GPU setup failed: {msg}"),
             Self::Texture(msg) => write!(f, "texture error: {msg}"),
+            Self::Audio(msg) => write!(f, "audio error: {msg}"),
         }
     }
 }
@@ -29,7 +32,7 @@ impl std::error::Error for Error {
         match self {
             Self::EventLoop(e) => Some(e),
             Self::Window(e) => Some(e),
-            Self::Gpu(_) | Self::Texture(_) => None,
+            Self::Gpu(_) | Self::Texture(_) | Self::Audio(_) => None,
         }
     }
 }

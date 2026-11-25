@@ -18,6 +18,10 @@ log = "0.4.35"
 env_logger = "0.11.12"
 png = "0.18.1"
 web-time = "1.1.0"
+# Audio: mixing and playback on cpal, decoding via symphonia. Only the
+# decoders the engine supports (WAV, Ogg Vorbis); the default features also
+# pull in D-Bus for realtime thread priority, which needs another system lib.
+kira = { version = "0.12.6", default-features = false, features = ["cpal", "wav", "pcm", "ogg", "vorbis"] }
 # Web only. wasm-bindgen and wasm-bindgen-cli-support (used by xtask) must be
 # the exact same version, so both are pinned with `=`.
 wasm-bindgen = "=0.2.130"

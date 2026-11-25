@@ -21,7 +21,12 @@ Rendering uses [wgpu](https://wgpu.rs), so you need a GPU driver with Vulkan,
 Metal, DirectX 12 or OpenGL ES support. On Linux, the window system libraries are
 loaded at runtime and are present on any desktop install: `libxkbcommon` plus
 Wayland (`libwayland-client`) or X11 (`libX11`, `libXcursor`, `libXrandr`, `libXi`,
-`libxkbcommon-x11`). No `-dev` packages are needed to build.
+`libxkbcommon-x11`).
+
+Sound uses [kira](https://docs.rs/kira) on top of [cpal](https://docs.rs/cpal).
+On Linux, building needs the ALSA headers (on Debian/Ubuntu:
+`sudo apt install libasound2-dev`). No other `-dev` packages are needed. If the
+game finds no sound device when it runs, it plays silently.
 
 Some tests draw on the GPU. Without a GPU, install a software driver
 (`mesa-vulkan-drivers` on Debian/Ubuntu) and run with `WGPU_BACKEND=vulkan`, as
@@ -33,7 +38,7 @@ CI does.
 cargo run --locked --example clear   # space cycles the background color, esc quits
 cargo run --locked --example rects   # move a box with arrows/WASD in a 320x180 view
 cargo run --locked --example sprites # animated sprite; P toggles pixel-perfect scaling
-cargo run --locked --example bounce  # paddle and balls; I toggles interpolation
+cargo run --locked --example bounce  # paddle and balls with sound; M music, I interpolation
 cargo run --locked --example text    # the built-in font: sizes, colors, layout
 ```
 
@@ -59,7 +64,12 @@ copy `target/web/<example>/` to any static web server.
 
 In the browser, `run()` returns immediately and the game keeps running in the
 page; errors and panics appear in the browser console. Browsers have no file
-system, so load images with `include_bytes!` and `Texture::from_png_bytes`.
+system, so load images with `include_bytes!` and `Texture::from_png_bytes`, and
+sounds with `include_bytes!` and `Sound::from_bytes`.
+
+Browsers allow sound only after the player clicks or presses a key on the page,
+so the engine starts audio then. Sound effects played before that are skipped.
+Music requested before that starts playing at that point.
 
 ## Development
 
@@ -88,6 +98,7 @@ crates/ferris_wheel/
 │   ├── gpu.rs        GPU device and window surface (wgpu)
 │   ├── renderer.rs   batched sprite and rectangle drawing
 │   ├── texture.rs    Texture: PNG loading, raw RGBA
+│   ├── audio.rs      Sound: WAV/Ogg loading, sound effects, music, volume
 │   ├── font.rs       Font: built-in 5x8 font, monospace sprite-sheet fonts
 │   ├── fonts/        the built-in font as editable pixel art (text file)
 │   ├── shaders/      WGSL shaders
@@ -96,6 +107,7 @@ crates/ferris_wheel/
 └── examples/         runnable demos
     ├── assets/       images used by the examples
     └── support/      helpers shared by the examples (logging)
+crates/ferris_wheel/tests/data/  files used by unit tests
 ```
 
 ## License

@@ -2,8 +2,9 @@
 
 use std::time::Duration;
 
+use crate::audio::Audio;
 use crate::viewport::{Scaling, Viewport};
-use crate::{Color, Font, Input, Rect, TextParams, Texture, Vec2};
+use crate::{Color, Font, Input, Rect, Sound, SoundParams, TextParams, Texture, Vec2};
 
 /// A game the engine can run. See [`crate::run`].
 pub trait Game {
@@ -26,6 +27,7 @@ pub struct Context {
     pub(crate) view_size: Vec2,
     pub(crate) scaling: Scaling,
     pub(crate) quit_requested: bool,
+    pub(crate) audio: Audio,
 }
 
 impl Context {
@@ -36,6 +38,7 @@ impl Context {
             view_size: viewport.view_size,
             scaling: viewport.scaling,
             quit_requested: false,
+            audio: Audio::new(),
         }
     }
 
@@ -69,6 +72,48 @@ impl Context {
     /// Closes the window and returns from [`crate::run`] after this update.
     pub fn quit(&mut self) {
         self.quit_requested = true;
+    }
+
+    /// Plays a sound once. Any number of sounds can play at the same time.
+    ///
+    /// Browsers allow sound only after the player clicks or presses a key
+    /// on the page; sounds played before that are skipped.
+    pub fn play_sound(&mut self, sound: &Sound) {
+        self.audio.play(sound, SoundParams::default());
+    }
+
+    /// Plays a sound once with a different volume, speed or stereo position.
+    pub fn play_sound_with(&mut self, sound: &Sound, params: SoundParams) {
+        self.audio.play(sound, params);
+    }
+
+    /// Plays a sound on repeat as background music, replacing any music
+    /// already playing. In browsers it starts once the player first clicks
+    /// or presses a key.
+    pub fn play_music(&mut self, sound: &Sound) {
+        self.audio.play_music(sound, SoundParams::default());
+    }
+
+    /// Like [`Context::play_music`], with a different volume, speed or
+    /// stereo position.
+    pub fn play_music_with(&mut self, sound: &Sound, params: SoundParams) {
+        self.audio.play_music(sound, params);
+    }
+
+    /// Fades out the music, if any is playing.
+    pub fn stop_music(&mut self) {
+        self.audio.stop_music();
+    }
+
+    /// The master volume, which scales all sounds and music. Starts at 1.0.
+    pub fn volume(&self) -> f32 {
+        self.audio.volume()
+    }
+
+    /// Sets the master volume: 1.0 leaves sounds unchanged, 0.0 mutes
+    /// everything.
+    pub fn set_volume(&mut self, volume: f32) {
+        self.audio.set_volume(volume);
     }
 }
 

@@ -23,6 +23,7 @@
 //! ```
 
 mod app;
+mod audio;
 mod color;
 mod error;
 mod font;
@@ -35,6 +36,7 @@ mod texture;
 mod time;
 mod viewport;
 
+pub use audio::{Sound, SoundParams};
 pub use color::Color;
 pub use error::Error;
 pub use font::{Font, TextParams};
