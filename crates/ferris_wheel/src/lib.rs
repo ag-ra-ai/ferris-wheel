@@ -42,6 +42,7 @@ pub use game::{Context, Frame, Game, SpriteParams};
 pub use input::{Input, Key, MouseButton};
 pub use math::{Rect, Vec2};
 pub use texture::Texture;
+pub use viewport::Scaling;
 
 /// The engine version, taken from `Cargo.toml`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -62,6 +63,10 @@ pub struct Config {
     /// space shows as black bars. For a pixel-art look use a small size such
     /// as `(320, 180)`.
     pub resolution: (u32, u32),
+    /// How the view is scaled to the window. [`Scaling::Fit`] (the default)
+    /// fills the most space; [`Scaling::PixelPerfect`] keeps every game
+    /// pixel the same size, which suits pixel art.
+    pub scaling: Scaling,
     /// How many times per second [`Game::update`] runs.
     pub updates_per_second: u32,
 }
@@ -73,6 +78,7 @@ impl Default for Config {
             width: 1280,
             height: 720,
             resolution: (1280, 720),
+            scaling: Scaling::Fit,
             updates_per_second: 60,
         }
     }

@@ -1,14 +1,15 @@
 //! Text in the built-in 5x8 pixel font, in a 320x180 view.
 //!
 //! Shows scaling, colors, centering with `Font::measure`, multiple lines,
-//! every character the font has, and values that change each frame.
+//! every character the font has, and values that change each frame. Uses
+//! pixel-perfect scaling so every font pixel is the same size on screen.
 //! Escape quits.
 //!
 //! Run with: `cargo run --example text`
 
 mod support;
 
-use ferris_wheel::{Color, Config, Context, Font, Frame, Game, Key, TextParams, Vec2};
+use ferris_wheel::{Color, Config, Context, Font, Frame, Game, Key, Scaling, TextParams, Vec2};
 
 const VIEW: Vec2 = Vec2::new(320.0, 180.0);
 
@@ -96,6 +97,7 @@ fn main() -> Result<(), ferris_wheel::Error> {
     let config = Config {
         title: "ferris-wheel: text".into(),
         resolution: (VIEW.x as u32, VIEW.y as u32),
+        scaling: Scaling::PixelPerfect,
         ..Config::default()
     };
     let game = TextDemo {

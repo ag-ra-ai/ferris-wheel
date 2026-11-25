@@ -32,7 +32,7 @@ CI does.
 ```sh
 cargo run --locked --example clear   # space cycles the background color, esc quits
 cargo run --locked --example rects   # move a box with arrows/WASD in a 320x180 view
-cargo run --locked --example sprites # animated sprite: arrows/AD walk, space jumps
+cargo run --locked --example sprites # animated sprite; P toggles pixel-perfect scaling
 cargo run --locked --example bounce  # paddle and balls; I toggles interpolation
 cargo run --locked --example text    # the built-in font: sizes, colors, layout
 ```
@@ -84,7 +84,7 @@ crates/ferris_wheel/
 │   ├── time.rs       fixed-timestep accumulator
 │   ├── input.rs      keyboard and mouse state
 │   ├── math.rs       Vec2, Rect
-│   ├── viewport.rs   fits the fixed-size view into the window (letterboxing)
+│   ├── viewport.rs   fits the view into the window: Fit or PixelPerfect scaling
 │   ├── gpu.rs        GPU device and window surface (wgpu)
 │   ├── renderer.rs   batched sprite and rectangle drawing
 │   ├── texture.rs    Texture: PNG loading, raw RGBA

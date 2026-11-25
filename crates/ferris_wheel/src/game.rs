@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use crate::viewport::Viewport;
+use crate::viewport::{Scaling, Viewport};
 use crate::{Color, Font, Input, Rect, TextParams, Texture, Vec2};
 
 /// A game the engine can run. See [`crate::run`].
@@ -24,6 +24,7 @@ pub struct Context {
     pub(crate) input: Input,
     pub(crate) step: Duration,
     pub(crate) view_size: Vec2,
+    pub(crate) scaling: Scaling,
     pub(crate) quit_requested: bool,
 }
 
@@ -33,6 +34,7 @@ impl Context {
             input: Input::new(viewport),
             step,
             view_size: viewport.view_size,
+            scaling: viewport.scaling,
             quit_requested: false,
         }
     }
@@ -51,6 +53,17 @@ impl Context {
     /// speeds by it to get distance per update.
     pub fn dt(&self) -> f32 {
         self.step.as_secs_f32()
+    }
+
+    /// How the view is currently scaled to the window.
+    pub fn scaling(&self) -> Scaling {
+        self.scaling
+    }
+
+    /// Changes how the view is scaled to the window, from the next frame on.
+    /// Mouse positions follow the new scaling too.
+    pub fn set_scaling(&mut self, scaling: Scaling) {
+        self.scaling = scaling;
     }
 
     /// Closes the window and returns from [`crate::run`] after this update.
@@ -228,13 +241,28 @@ mod tests {
 
     #[test]
     fn dt_is_step_in_seconds() {
-        let ctx = Context::new(Duration::from_millis(20), Viewport::fit(VIEW, 640, 360));
+        let ctx = Context::new(
+            Duration::from_millis(20),
+            Viewport::fit(VIEW, 640, 360, Scaling::Fit),
+        );
         assert!((ctx.dt() - 0.02).abs() < 1e-6);
     }
 
     #[test]
+    fn scaling_starts_from_viewport_and_can_change() {
+        let viewport = Viewport::fit(VIEW, 640, 360, Scaling::PixelPerfect);
+        let mut ctx = Context::new(Duration::from_millis(20), viewport);
+        assert_eq!(ctx.scaling(), Scaling::PixelPerfect);
+        ctx.set_scaling(Scaling::Fit);
+        assert_eq!(ctx.scaling(), Scaling::Fit);
+    }
+
+    #[test]
     fn quit_sets_flag() {
-        let mut ctx = Context::new(Duration::from_millis(20), Viewport::fit(VIEW, 640, 360));
+        let mut ctx = Context::new(
+            Duration::from_millis(20),
+            Viewport::fit(VIEW, 640, 360, Scaling::Fit),
+        );
         ctx.quit();
         assert!(ctx.quit_requested);
     }

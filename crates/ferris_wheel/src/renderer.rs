@@ -428,7 +428,7 @@ fn write_instance(out: &mut Vec<u8>, rect: Rect, uv: Rect, color: Color) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Font, SpriteParams, TextParams, Texture, Vec2};
+    use crate::{Font, Scaling, SpriteParams, TextParams, Texture, Vec2};
 
     #[test]
     fn instance_layout_matches_stride() {
@@ -566,7 +566,7 @@ mod tests {
     fn gpu_draws_letterbox_background_and_rects() {
         // A 32x32 view in a 64x32 target: scale 1, 16-pixel bars left and right.
         let (width, height) = (64, 32);
-        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), width, height);
+        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), width, height, Scaling::Fit);
         let mut frame = Frame::new(viewport.view_size);
         frame.clear(Color::hex(0x2e3440));
         frame.fill_rect(Rect::new(8.0, 8.0, 8.0, 8.0), Color::hex(0xbf616a));
@@ -588,7 +588,7 @@ mod tests {
     #[test]
     fn gpu_draws_sprites_with_nearest_sampling_flip_region_and_tint() {
         let (width, height) = (64, 32);
-        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), width, height);
+        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), width, height, Scaling::Fit);
         // 2x2 texture: red, green / blue, white.
         #[rustfmt::skip]
         let pixels = vec![
@@ -631,7 +631,7 @@ mod tests {
     #[test]
     fn gpu_draws_builtin_text_pixel_exact() {
         let (width, height) = (64, 32);
-        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), width, height);
+        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), width, height, Scaling::Fit);
         let mut frame = Frame::new(viewport.view_size);
         frame.clear(Color::BLACK);
         // "H" at scale 1: columns 0 and 4 lit in every row, row 3 fully lit.
@@ -665,11 +665,49 @@ mod tests {
     }
 
     #[test]
+    fn gpu_pixel_perfect_draws_every_texel_the_same_size() {
+        // A 16x16 view in a 64x40 target: Fit would scale 2.5x; pixel-perfect
+        // uses 2x, centered at (16, 4).
+        let (width, height) = (64, 40);
+        let viewport = Viewport::fit(Vec2::new(16.0, 16.0), width, height, Scaling::PixelPerfect);
+        assert_eq!(
+            (viewport.scale, viewport.offset),
+            (2.0, Vec2::new(16.0, 4.0))
+        );
+
+        // 4x1 texture: red, green, blue, white, drawn 1 world unit per texel.
+        #[rustfmt::skip]
+        let pixels = vec![
+            255, 0, 0, 255,   0, 255, 0, 255,   0, 0, 255, 255,   255, 255, 255, 255,
+        ];
+        let texture = Texture::from_rgba8(4, 1, pixels).unwrap();
+        let mut frame = Frame::new(viewport.view_size);
+        frame.clear(Color::hex(0x2e3440));
+        frame.draw_sprite(&texture, Rect::new(0.0, 0.0, 4.0, 1.0));
+
+        let px = render_offscreen(&frame, &viewport, width, height);
+        let at = |x: u32, y: u32| pixel(&px, width, x, y);
+
+        assert_rgb(at(15, 4), 0x000000, "left border");
+        assert_rgb(at(16, 3), 0x000000, "top border");
+        assert_rgb(at(48, 4), 0x000000, "right border");
+        let expected = [0xff0000, 0x00ff00, 0x0000ff, 0xffffff];
+        for (i, &color) in expected.iter().enumerate() {
+            let x0 = 16 + 2 * i as u32;
+            // Exactly a 2x2 block of screen pixels per texel.
+            for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                assert_rgb(at(x0 + dx, 4 + dy), color, "texel block");
+            }
+        }
+        assert_rgb(at(16, 6), 0x2e3440, "background below the sprite");
+    }
+
+    #[test]
     fn gpu_textures_are_freed_after_drop() {
         let (device, queue) = test_gpu();
         let format = wgpu::TextureFormat::Rgba8UnormSrgb;
         let mut renderer = QuadRenderer::new(&device, &queue, format);
-        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), 32, 32);
+        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), 32, 32, Scaling::Fit);
 
         let texture = Texture::from_rgba8(1, 1, vec![255; 4]).unwrap();
         let mut frame = Frame::new(viewport.view_size);

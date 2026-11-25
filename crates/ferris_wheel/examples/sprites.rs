@@ -3,13 +3,18 @@
 //! - Arrow keys / A, D walk; Space jumps. Walking plays the hop animation and
 //!   the sprite flips to face the way it moves.
 //! - The row at the top shows tinting and transparency.
+//! - P switches between pixel-perfect and fit scaling (shown top-right).
+//!   Resize the window to an in-between size to see the difference: with
+//!   fit, some sprite pixels are wider than others.
 //! - Escape quits.
 //!
 //! Run with: `cargo run --example sprites`
 
 mod support;
 
-use ferris_wheel::{Color, Config, Context, Frame, Game, Key, Rect, SpriteParams, Texture, Vec2};
+use ferris_wheel::{
+    Color, Config, Context, Font, Frame, Game, Key, Rect, Scaling, SpriteParams, Texture, Vec2,
+};
 
 /// 4 frames of 16x16, side by side. Embedded so the example runs from any
 /// working directory; use `Texture::from_png_file` to load at runtime.
@@ -24,6 +29,7 @@ const GROUND_Y: f32 = 180.0 - 2.0 * TILE;
 const WALK_SPEED: f32 = 80.0;
 const JUMP_SPEED: f32 = 260.0;
 const GRAVITY: f32 = 700.0;
+const STARTING_SCALING: Scaling = Scaling::PixelPerfect;
 
 struct SpritesDemo {
     blob: Texture,
@@ -35,6 +41,8 @@ struct SpritesDemo {
     facing_left: bool,
     walking: bool,
     anim_time: f32,
+    /// Copied from the context each update, to show it in `draw`.
+    scaling: Scaling,
 }
 
 impl SpritesDemo {
@@ -48,6 +56,7 @@ impl SpritesDemo {
             facing_left: false,
             walking: false,
             anim_time: 0.0,
+            scaling: STARTING_SCALING,
         })
     }
 
@@ -111,7 +120,21 @@ impl Game for SpritesDemo {
             self.velocity_y = 0.0;
         }
 
-        if input.key_pressed(Key::Escape) {
+        // Read the keys first: `input` borrows `ctx`, which must be free
+        // before calling `set_scaling` or `quit`.
+        let toggle_scaling = input.key_pressed(Key::KeyP);
+        let quit = input.key_pressed(Key::Escape);
+
+        if toggle_scaling {
+            let next = match ctx.scaling() {
+                Scaling::PixelPerfect => Scaling::Fit,
+                Scaling::Fit => Scaling::PixelPerfect,
+            };
+            ctx.set_scaling(next);
+        }
+        self.scaling = ctx.scaling();
+
+        if quit {
             ctx.quit();
         }
     }
@@ -150,6 +173,18 @@ impl Game for SpritesDemo {
             frame.draw_sprite_with(&self.blob, dest, params);
         }
 
+        // Current scaling mode, right-aligned.
+        let label = match self.scaling {
+            Scaling::PixelPerfect => "P: pixel-perfect",
+            Scaling::Fit => "P: fit",
+        };
+        let width = Font::builtin().measure(label, 1.0).x;
+        frame.draw_text(
+            label,
+            Vec2::new(view.x - 6.0 - width, 8.0),
+            Color::hex(0xd8dee9),
+        );
+
         // The player. Frame 1 is the resting pose.
         let index = if self.walking {
             (self.anim_time * FRAMES_PER_SECOND) as usize % FRAMES
@@ -175,6 +210,7 @@ fn main() -> Result<(), ferris_wheel::Error> {
     let config = Config {
         title: "ferris-wheel: sprites (arrows/AD walk, space jumps, esc quits)".into(),
         resolution: (320, 180),
+        scaling: STARTING_SCALING,
         ..Config::default()
     };
     ferris_wheel::run(config, SpritesDemo::new()?)

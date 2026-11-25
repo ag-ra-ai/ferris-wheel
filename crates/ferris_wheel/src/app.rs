@@ -24,7 +24,7 @@ pub(crate) fn run<G: Game + 'static>(config: Config, game: G) -> Result<(), Erro
     let (w, h) = config.resolution;
     let view_size = Vec2::new(w.max(1) as f32, h.max(1) as f32);
     // Placeholder until the window exists and reports its real size.
-    let viewport = Viewport::fit(view_size, w.max(1), h.max(1));
+    let viewport = Viewport::fit(view_size, w.max(1), h.max(1), config.scaling);
     #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
     let mut app = App {
         ctx: Context::new(timestep.step(), viewport),
@@ -143,7 +143,7 @@ impl<G: Game> App<G> {
         if width == 0 || height == 0 {
             return; // minimized; keep the last good viewport
         }
-        self.viewport = Viewport::fit(self.ctx.view_size, width, height);
+        self.viewport = Viewport::fit(self.ctx.view_size, width, height, self.ctx.scaling);
         self.ctx.input.set_viewport(self.viewport);
     }
 
@@ -160,6 +160,13 @@ impl<G: Game> App<G> {
                 event_loop.exit();
                 return;
             }
+        }
+
+        // The game may have switched scaling modes during an update.
+        if self.ctx.scaling != self.viewport.scaling
+            && let Some((w, h)) = self.gpu.as_ref().map(Gpu::size)
+        {
+            self.set_viewport(w, h);
         }
 
         self.frame.reset();

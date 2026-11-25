@@ -7,6 +7,8 @@ use winit::event::{ElementState, WindowEvent};
 use winit::keyboard::PhysicalKey;
 
 use crate::Vec2;
+#[cfg(test)]
+use crate::viewport::Scaling;
 use crate::viewport::Viewport;
 
 /// A mouse button.
@@ -170,7 +172,12 @@ mod tests {
     use super::*;
 
     fn input() -> Input {
-        Input::new(Viewport::fit(Vec2::new(320.0, 180.0), 640, 360))
+        Input::new(Viewport::fit(
+            Vec2::new(320.0, 180.0),
+            640,
+            360,
+            Scaling::Fit,
+        ))
     }
 
     #[test]
@@ -245,7 +252,12 @@ mod tests {
         input.cursor = Some(Vec2::new(200.0, 100.0));
         assert_eq!(input.mouse_position(), Some(Vec2::new(100.0, 50.0)));
 
-        input.set_viewport(Viewport::fit(Vec2::new(320.0, 180.0), 1280, 720)); // scale 4
+        input.set_viewport(Viewport::fit(
+            Vec2::new(320.0, 180.0),
+            1280,
+            720,
+            Scaling::Fit,
+        )); // scale 4
         assert_eq!(input.mouse_position(), Some(Vec2::new(50.0, 25.0)));
     }
 }
