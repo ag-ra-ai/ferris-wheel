@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use crate::viewport::Viewport;
-use crate::{Color, Input, Rect, Texture, Vec2};
+use crate::{Color, Font, Input, Rect, TextParams, Texture, Vec2};
 
 /// A game the engine can run. See [`crate::run`].
 pub trait Game {
@@ -162,6 +162,31 @@ impl Frame {
         self.draw_sprite_with(texture, dest, SpriteParams::default());
     }
 
+    /// Draws `text` in the built-in font at scale 1, with its top-left corner
+    /// at `pos`. `\n` starts a new line.
+    pub fn draw_text(&mut self, text: &str, pos: Vec2, color: Color) {
+        let params = TextParams {
+            color,
+            ..TextParams::default()
+        };
+        self.draw_text_with(&Font::builtin(), text, pos, params);
+    }
+
+    /// Draws `text` in `font` with the given color and scale, with its
+    /// top-left corner at `pos`. Use [`Font::measure`] to center or
+    /// right-align it.
+    pub fn draw_text_with(&mut self, font: &Font, text: &str, pos: Vec2, params: TextParams) {
+        let texture = font.texture();
+        font.layout(text, pos, params.scale, |source, dest| {
+            let sprite = SpriteParams {
+                source: Some(source),
+                tint: params.color,
+                ..SpriteParams::default()
+            };
+            self.draw_sprite_with(texture, dest, sprite);
+        });
+    }
+
     /// Draws `texture` into `dest` with a source region, tint or flip.
     pub fn draw_sprite_with(&mut self, texture: &Texture, dest: Rect, params: SpriteParams) {
         let source =
@@ -239,6 +264,16 @@ mod tests {
         let mut frame = Frame::new(VIEW);
         frame.draw_sprite_with(&texture, Rect::new(0.0, 0.0, 16.0, 16.0), params);
         frame.quads[0].uv
+    }
+
+    #[test]
+    fn text_becomes_one_tinted_quad_per_visible_char() {
+        let mut frame = Frame::new(VIEW);
+        frame.draw_text("Hi !", Vec2::new(4.0, 4.0), Color::RED);
+        assert_eq!(frame.quads.len(), 3);
+        assert!(frame.quads.iter().all(|q| q.color == Color::RED));
+        assert!(frame.quads.iter().all(|q| q.texture.is_some()));
+        assert_eq!(frame.quads[2].rect.pos, Vec2::new(4.0 + 3.0 * 6.0, 4.0));
     }
 
     #[test]

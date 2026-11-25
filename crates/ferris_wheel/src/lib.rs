@@ -25,6 +25,7 @@
 mod app;
 mod color;
 mod error;
+mod font;
 mod game;
 mod gpu;
 mod input;
@@ -36,6 +37,7 @@ mod viewport;
 
 pub use color::Color;
 pub use error::Error;
+pub use font::{Font, TextParams};
 pub use game::{Context, Frame, Game, SpriteParams};
 pub use input::{Input, Key, MouseButton};
 pub use math::{Rect, Vec2};

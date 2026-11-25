@@ -2,17 +2,16 @@
 //!
 //! - Arrow keys / A, D move the paddle. Where a ball hits the paddle sets the
 //!   angle it bounces off at.
-//! - Space launches another ball. Losing every ball resets the hit count
-//!   (the dots at the top).
-//! - I turns interpolation on and off (the square in the top-right corner is
-//!   green when on). On a screen faster than 60 Hz, motion stutters when off.
+//! - Space launches another ball. Losing every ball resets the hit count.
+//! - I turns interpolation ("Smooth" in the top-right corner) on and off. On
+//!   a screen faster than 60 Hz, motion stutters when it is off.
 //! - Escape quits.
 //!
 //! Run with: `cargo run --example bounce`
 
 mod support;
 
-use ferris_wheel::{Color, Config, Context, Frame, Game, Key, Rect, Vec2};
+use ferris_wheel::{Color, Config, Context, Font, Frame, Game, Key, Rect, Vec2};
 
 const VIEW: Vec2 = Vec2::new(320.0, 180.0);
 const PADDLE_SIZE: Vec2 = Vec2::new(48.0, 6.0);
@@ -171,17 +170,17 @@ impl Game for Bounce {
 
         frame.clear(Color::hex(0x2e3440));
 
-        // Hit count as a row of dots.
-        for i in 0..self.hits.min(60) {
-            let dot = Rect::new(4.0 + i as f32 * 5.0, 4.0, 3.0, 3.0);
-            frame.fill_rect(dot, Color::hex(0xebcb8b));
-        }
-        let indicator = if self.interpolate {
-            Color::hex(0xa3be8c)
+        let hud = format!("Hits {}   Balls {}", self.hits, self.balls.len());
+        frame.draw_text(&hud, Vec2::new(4.0, 4.0), Color::hex(0xebcb8b));
+
+        // Interpolation state, right-aligned.
+        let (label, color) = if self.interpolate {
+            ("Smooth: on (I)", Color::hex(0xa3be8c))
         } else {
-            Color::hex(0xbf616a)
+            ("Smooth: off (I)", Color::hex(0xbf616a))
         };
-        frame.fill_rect(Rect::new(VIEW.x - 8.0, 3.0, 5.0, 5.0), indicator);
+        let width = Font::builtin().measure(label, 1.0).x;
+        frame.draw_text(label, Vec2::new(VIEW.x - 4.0 - width, 4.0), color);
 
         let paddle_x = self.paddle_prev_x + (self.paddle_x - self.paddle_prev_x) * t;
         frame.fill_rect(Self::paddle_rect(paddle_x), Color::hex(0x88c0d0));

@@ -428,7 +428,7 @@ fn write_instance(out: &mut Vec<u8>, rect: Rect, uv: Rect, color: Color) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{SpriteParams, Texture, Vec2};
+    use crate::{Font, SpriteParams, TextParams, Texture, Vec2};
 
     #[test]
     fn instance_layout_matches_stride() {
@@ -626,6 +626,42 @@ mod tests {
         assert_rgb(at(14, 1), 0xff0000, "flipped: red on the right");
         assert_rgb(at(4, 12), 0x808080, "tinted white region");
         assert_rgb(at(12, 12), 0xebcb8b, "rect after sprites");
+    }
+
+    #[test]
+    fn gpu_draws_builtin_text_pixel_exact() {
+        let (width, height) = (64, 32);
+        let viewport = Viewport::fit(Vec2::new(32.0, 32.0), width, height);
+        let mut frame = Frame::new(viewport.view_size);
+        frame.clear(Color::BLACK);
+        // "H" at scale 1: columns 0 and 4 lit in every row, row 3 fully lit.
+        frame.draw_text("H", Vec2::new(0.0, 0.0), Color::hex(0xebcb8b));
+        // "T" at scale 2: top row (2 units tall) fully lit, stem in columns 4-5.
+        let big = TextParams {
+            color: Color::WHITE,
+            scale: 2.0,
+        };
+        frame.draw_text_with(&Font::builtin(), "T", Vec2::new(8.0, 0.0), big);
+
+        let px = render_offscreen(&frame, &viewport, width, height);
+        let at = |x: u32, y: u32| pixel(&px, width, 16 + x, y);
+
+        for y in 0..7 {
+            assert_rgb(at(0, y), 0xebcb8b, "H left stem");
+            assert_rgb(at(4, y), 0xebcb8b, "H right stem");
+        }
+        assert_rgb(at(2, 0), 0x000000, "H gap above bar");
+        assert_rgb(at(2, 3), 0xebcb8b, "H crossbar");
+        assert_rgb(at(2, 7), 0x000000, "H descender row is empty");
+        assert_rgb(at(5, 3), 0x000000, "spacing after H");
+
+        for x in 8..18 {
+            assert_rgb(at(x, 0), 0xffffff, "T top bar");
+            assert_rgb(at(x, 1), 0xffffff, "T top bar, 2nd row at scale 2");
+        }
+        assert_rgb(at(12, 10), 0xffffff, "T stem");
+        assert_rgb(at(13, 10), 0xffffff, "T stem is 2 wide");
+        assert_rgb(at(11, 10), 0x000000, "left of T stem");
     }
 
     #[test]

@@ -34,6 +34,7 @@ cargo run --locked --example clear   # space cycles the background color, esc qu
 cargo run --locked --example rects   # move a box with arrows/WASD in a 320x180 view
 cargo run --locked --example sprites # animated sprite: arrows/AD walk, space jumps
 cargo run --locked --example bounce  # paddle and balls; I toggles interpolation
+cargo run --locked --example text    # the built-in font: sizes, colors, layout
 ```
 
 Set `RUST_LOG=info` to see which GPU and graphics backend are used, and
@@ -87,6 +88,8 @@ crates/ferris_wheel/
 │   ├── gpu.rs        GPU device and window surface (wgpu)
 │   ├── renderer.rs   batched sprite and rectangle drawing
 │   ├── texture.rs    Texture: PNG loading, raw RGBA
+│   ├── font.rs       Font: built-in 5x8 font, monospace sprite-sheet fonts
+│   ├── fonts/        the built-in font as editable pixel art (text file)
 │   ├── shaders/      WGSL shaders
 │   ├── color.rs      Color type
 │   └── error.rs      Error type
